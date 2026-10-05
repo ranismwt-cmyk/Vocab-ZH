@@ -1,1 +1,832 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>隨機抽詞卡片 - 語文樂</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Tone.js for clean auditory feedback -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <!-- Google Fonts: Noto Sans TC & Fredoka -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Noto+Sans+TC:wght@400;600;700;900&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans TC"', 'sans-serif'],
+            display: ['Fredoka', '"Noto Sans TC"', 'sans-serif']
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d'
+            },
+            pastel: {
+              bg: '#f8fafc',
+              card: '#ffffff',
+              accent: '#6366f1'
+            }
+          }
+        }
+      }
+    }
+  </script>
 
+  <style>
+    /* 3D Perspective for card flipping */
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+    .preserve-3d {
+      transform-style: preserve-3d;
+    }
+    .backface-hidden {
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    
+    /* Smooth bounce and flip classes */
+    .card-anim-flip {
+      animation: flipCard 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .card-anim-pop {
+      animation: popCard 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes flipCard {
+      0% {
+        transform: rotateY(0deg) scale(0.96);
+      }
+      50% {
+        transform: rotateY(90deg) scale(0.92);
+      }
+      100% {
+        transform: rotateY(0deg) scale(1);
+      }
+    }
+
+    @keyframes popCard {
+      0% { transform: scale(0.92); opacity: 0.8; }
+      60% { transform: scale(1.05); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Floating subtle effect */
+    .float-badge {
+      animation: floatBadge 3s ease-in-out infinite;
+    }
+    @keyframes floatBadge {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-4px); }
+    }
+
+    /* Hide scrollbar for history drawer */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+
+<body class="bg-gradient-to-b from-sky-50 via-indigo-50/40 to-slate-100 text-slate-800 min-h-screen flex flex-col font-sans select-none antialiased overflow-x-hidden">
+
+  <!-- Header Bar -->
+  <header class="w-full max-w-lg mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 to-sky-400 flex items-center justify-center text-white shadow-md shadow-indigo-200">
+        <i class="ph-bold ph-cards text-2xl"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-slate-800 leading-tight">隨機詞語卡片</h1>
+        <p class="text-xs font-medium text-slate-500" id="totalWordsBadge">載入中...</p>
+      </div>
+    </div>
+
+    <!-- Quick Action Buttons -->
+    <div class="flex items-center gap-1.5 bg-white/80 backdrop-blur-md p-1 rounded-2xl shadow-sm border border-slate-200/60">
+      <!-- Voice Toggle -->
+      <button id="btnVoiceToggle" class="p-2 text-indigo-600 hover:bg-indigo-50 active:scale-95 rounded-xl transition-all" title="自動發音開關">
+        <i id="iconVoice" class="ph-bold ph-speaker-high text-xl"></i>
+      </button>
+      
+      <!-- Speech Accent Selector Button (Cantonese / Mandarin) -->
+      <button id="btnVoiceLang" class="px-2 py-1 text-xs font-bold rounded-xl text-slate-700 hover:bg-slate-100 transition-all border border-slate-200" title="切換粵語或普通話發音">
+        粵語
+      </button>
+
+      <!-- Manage Words Modal Trigger -->
+      <button id="btnOpenWords" class="p-2 text-slate-600 hover:bg-slate-100 active:scale-95 rounded-xl transition-all" title="查看與編輯詞庫">
+        <i class="ph-bold ph-list-dashes text-xl"></i>
+      </button>
+      
+      <!-- History Drawer Trigger -->
+      <button id="btnOpenHistory" class="p-2 text-slate-600 hover:bg-slate-100 active:scale-95 rounded-xl transition-all relative" title="抽取記錄">
+        <i class="ph-bold ph-clock-counter-clockwise text-xl"></i>
+        <span id="historyDot" class="hidden absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-white"></span>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 w-full max-w-lg mx-auto px-4 flex flex-col items-center justify-center gap-5 my-auto py-2">
+    
+    <!-- Mode Switch & Remaining Pill -->
+    <div class="w-full flex items-center justify-between gap-2 px-1">
+      <div class="inline-flex p-1 bg-white/90 backdrop-blur rounded-2xl border border-slate-200/80 shadow-sm text-xs font-semibold">
+        <button id="modeRandom" class="px-3 py-1.5 rounded-xl transition-all text-white bg-indigo-600 shadow-sm">
+          隨機抽取
+        </button>
+        <button id="modeUnique" class="px-3 py-1.5 rounded-xl transition-all text-slate-500 hover:text-slate-800">
+          不重複卡池
+        </button>
+      </div>
+
+      <!-- Remaining / Pool Status -->
+      <div id="deckStatusTag" class="text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-200/70 text-slate-600 flex items-center gap-1.5">
+        <i class="ph-bold ph-stack"></i>
+        <span id="deckStatusText">無限抽模式</span>
+      </div>
+    </div>
+
+    <!-- Progress bar for Unique mode (hidden by default) -->
+    <div id="progressBarWrapper" class="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden hidden transition-all">
+      <div id="progressBar" class="bg-gradient-to-r from-indigo-500 to-sky-400 h-full w-full transition-all duration-300"></div>
+    </div>
+
+    <!-- Interactive Card Display -->
+    <div class="w-full perspective-1000">
+      <div id="wordCard" class="group relative w-full h-72 sm:h-80 bg-white rounded-3xl p-6 shadow-xl shadow-indigo-500/10 border-2 border-indigo-100/80 flex flex-col items-center justify-between cursor-pointer active:scale-[0.985] transition-transform select-none touch-manipulation">
+        
+        <!-- Top Card Bar -->
+        <div class="w-full flex items-center justify-between text-slate-400">
+          <span id="cardCategoryTag" class="text-xs font-semibold tracking-wider uppercase px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100/60">
+            按一下抽詞
+          </span>
+          <button id="btnCardSpeak" class="w-10 h-10 rounded-2xl hover:bg-slate-100 text-slate-500 active:scale-90 flex items-center justify-center transition-all" title="朗讀此詞語">
+            <i class="ph-bold ph-speaker-high text-xl"></i>
+          </button>
+        </div>
+
+        <!-- Center Word Area -->
+        <div class="flex-1 flex flex-col items-center justify-center w-full px-2">
+          <div id="wordDisplay" class="text-6xl sm:text-7xl font-black text-slate-800 tracking-wider text-center drop-shadow-sm select-none transition-all">
+            點擊抽詞
+          </div>
+          <div id="pinyinHint" class="text-sm font-medium text-slate-400 mt-2 tracking-normal opacity-0 transition-opacity">
+            輕按卡片或下方按鈕換詞
+          </div>
+        </div>
+
+        <!-- Card Bottom Prompt / Counter -->
+        <div class="w-full flex items-center justify-between text-xs text-slate-400 font-medium pt-2 border-t border-slate-100">
+          <span id="cardCounterText">抽取次數：0</span>
+          <span class="flex items-center gap-1 text-indigo-500 group-hover:translate-x-0.5 transition-transform">
+            點擊卡片 <i class="ph-bold ph-arrow-right"></i>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Primary Big Action Button -->
+    <div class="w-full flex flex-col gap-2.5">
+      <button id="btnPick" class="w-full py-4 px-6 bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 hover:from-indigo-500 hover:to-sky-400 active:scale-[0.98] text-white rounded-2xl font-bold text-xl tracking-wide shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2.5 transition-all touch-manipulation">
+        <i class="ph-bold ph-dice-five text-2xl"></i>
+        <span>隨機出一個詞</span>
+      </button>
+
+      <div class="flex items-center justify-between gap-2">
+        <!-- Re-speak Button -->
+        <button id="btnRepeatSound" class="flex-1 py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-semibold rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all">
+          <i class="ph-bold ph-speaker-simple-high text-indigo-600 text-base"></i>
+          <span>重聽發音</span>
+        </button>
+
+        <!-- Shuffle / Reset Deck in Unique Mode -->
+        <button id="btnResetDeck" class="py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-sm font-semibold rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all" title="重設卡池">
+          <i class="ph-bold ph-arrows-clockwise text-slate-500"></i>
+          <span>重整牌庫</span>
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Word Library Modal -->
+  <div id="modalWords" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity opacity-0">
+    <div id="modalWordsCard" class="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh] transform transition-transform translate-y-full sm:translate-y-0 sm:scale-95">
+      <!-- Modal Header -->
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="ph-bold ph-book-open-text text-xl text-indigo-600"></i>
+          <h2 class="text-lg font-bold text-slate-800">詞庫管理</h2>
+          <span id="modalWordsCount" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">35 個</span>
+        </div>
+        <button id="btnCloseWords" class="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-all">
+          <i class="ph-bold ph-x text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Add New Word Input -->
+      <div class="px-5 py-3 bg-slate-50 border-b border-slate-100">
+        <div class="flex gap-2">
+          <input id="inputNewWord" type="text" placeholder="輸入自訂新詞語（如：圖書館）" maxlength="12" class="flex-1 px-3.5 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+          <button id="btnAddWord" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-sm font-semibold rounded-xl flex items-center gap-1 shadow-sm transition-all">
+            <i class="ph-bold ph-plus"></i> 新增
+          </button>
+        </div>
+      </div>
+
+      <!-- Words Tag Grid -->
+      <div class="p-5 overflow-y-auto no-scrollbar flex flex-wrap gap-2" id="wordsTagContainer">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+        <button id="btnRestoreDefault" class="text-xs text-rose-500 hover:text-rose-700 font-semibold flex items-center gap-1">
+          <i class="ph-bold ph-arrow-counter-clockwise"></i> 恢復原裝預設詞庫
+        </button>
+        <button id="btnCloseWordsBtn" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold rounded-xl transition-all">
+          關閉
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Drawer -->
+  <div id="modalHistory" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity opacity-0">
+    <div id="modalHistoryCard" class="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[80vh] transform transition-transform translate-y-full sm:translate-y-0 sm:scale-95">
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="ph-bold ph-clock-counter-clockwise text-xl text-indigo-600"></i>
+          <h2 class="text-lg font-bold text-slate-800">抽詞記錄</h2>
+          <span id="historyCountBadge" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">0 次</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <button id="btnClearHistory" class="text-xs text-slate-400 hover:text-rose-600 px-2 py-1 rounded-lg hover:bg-rose-50 transition-all" title="清空所有記錄">
+            清空
+          </button>
+          <button id="btnCloseHistory" class="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-all">
+            <i class="ph-bold ph-x text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="historyList" class="p-4 overflow-y-auto no-scrollbar space-y-2 flex-1 min-h-[160px]">
+        <!-- History items dynamically inserted -->
+      </div>
+    </div>
+  </div>
+
+  <div id="toastMessage" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800/90 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-2xl shadow-xl backdrop-blur-md opacity-0 pointer-events-none transition-all duration-300 transform translate-y-2 z-50 flex items-center gap-2">
+    <i class="ph-bold ph-info text-base text-indigo-400"></i>
+    <span id="toastText">訊息</span>
+  </div>
+
+  <script>
+    // 預設詞語清單（用戶提供完整名單）
+    const DEFAULT_WORD_LIST = [
+      "背上", "寶貝", "不少", "作業本", "顏色筆", "收拾", "書包", "新", "我",
+      "小學生", "課本", "鉛筆", "上學",
+      "先", "飯菜", "香", "擺", "滿", "桌", "吃", "說", "爸爸", "媽媽", "祖母",
+      "大家",
+      "可可", "茶", "咖啡", "飲料", "喝", "愛", "杯", "味道", "美妙"
+    ];
+
+    // 應用狀態
+    const state = {
+      words: [...DEFAULT_WORD_LIST],
+      deck: [], // 用於不重複抽取模式
+      history: [],
+      currentWord: null,
+      mode: 'random', // 'random' 或 'unique'
+      voiceEnabled: true,
+      voiceLang: 'zh-HK', // 預設廣東話/粵語，亦可切換普通話 'zh-CN'
+      pickCount: 0,
+      synth: window.speechSynthesis,
+      audioInitialized: false
+    };
+
+    // 儲存金鑰
+    const STORAGE_KEY = 'hk_word_app_custom_words';
+
+    // Tone.js 輕快音效合成器
+    let bellSynth = null;
+    function initAudio() {
+      if (!state.audioInitialized && typeof Tone !== 'undefined') {
+        try {
+          bellSynth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "triangle" },
+            envelope: { attack: 0.005, decay: 0.1, sustain: 0.01, release: 0.3 }
+          }).toDestination();
+          bellSynth.volume.value = -12;
+          state.audioInitialized = true;
+        } catch (e) {
+          console.warn("Audio init deferred");
+        }
+      }
+    }
+
+    function playChime(success = false) {
+      if (!state.voiceEnabled) return;
+      initAudio();
+      try {
+        if (Tone.context.state !== 'running') {
+          Tone.start();
+        }
+        if (bellSynth) {
+          if (success) {
+            bellSynth.triggerAttackRelease(["C5", "G5"], "16n");
+          } else {
+            bellSynth.triggerAttackRelease(["E5"], "32n");
+          }
+        }
+      } catch (err) {}
+    }
+
+    function loadSavedWords() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            state.words = parsed;
+          }
+        }
+      } catch (e) {
+        state.words = [...DEFAULT_WORD_LIST];
+      }
+      resetDeck();
+      updateUI();
+    }
+
+    function saveWordsToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.words));
+      } catch (e) {}
+    }
+
+    function resetDeck() {
+      // 複製一份並洗牌（Fisher-Yates Shuffle）
+      state.deck = [...state.words];
+      for (let i = state.deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [state.deck[i], state.deck[j]] = [state.deck[j], state.deck[i]];
+      }
+      updateDeckProgressBar();
+    }
+
+    function updateDeckProgressBar() {
+      const progressBarWrapper = document.getElementById('progressBarWrapper');
+      const progressBar = document.getElementById('progressBar');
+      const statusText = document.getElementById('deckStatusText');
+
+      if (state.mode === 'unique') {
+        progressBarWrapper.classList.remove('hidden');
+        const remaining = state.deck.length;
+        const total = state.words.length;
+        const percent = (remaining / total) * 100;
+        progressBar.style.width = `${percent}%`;
+        statusText.textContent = `剩餘 ${remaining} / ${total} 個`;
+      } else {
+        progressBarWrapper.classList.add('hidden');
+        statusText.textContent = `無限隨機抽`;
+      }
+    }
+
+    function speakWord(text) {
+      if (!state.synth) return;
+      if (!text || text === "點擊抽詞" || text === "準備好") return;
+
+      try {
+        state.synth.cancel(); // 停止目前正在播放的語音
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.95;
+        utterance.pitch = 1.0;
+
+        // 搜尋最合適語音
+        const voices = state.synth.getVoices();
+        let targetVoice = null;
+
+        if (state.voiceLang === 'zh-HK') {
+          targetVoice = voices.find(v => v.lang.includes('HK') || v.lang.includes('yue') || v.lang.toLowerCase().includes('hong kong') || v.name.includes('Sin-ji') || v.name.includes('Cantonese'));
+          if (!targetVoice) {
+            targetVoice = voices.find(v => v.lang.startsWith('zh'));
+          }
+          utterance.lang = 'zh-HK';
+        } else {
+          targetVoice = voices.find(v => v.lang.includes('CN') || v.lang.includes('TW') || v.lang.includes('cmn'));
+          utterance.lang = 'zh-CN';
+        }
+
+        if (targetVoice) {
+          utterance.voice = targetVoice;
+        }
+
+        state.synth.speak(utterance);
+      } catch (e) {
+        console.warn('Speech synthesis error:', e);
+      }
+    }
+
+    function triggerVibration(duration = 25) {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate(duration);
+        } catch (e) {}
+      }
+    }
+
+    function showToast(text) {
+      const toast = document.getElementById('toastMessage');
+      const toastText = document.getElementById('toastText');
+      toastText.textContent = text;
+      toast.classList.remove('opacity-0', 'translate-y-2');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(window.__toastTimeout);
+      window.__toastTimeout = setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 2000);
+    }
+
+    function pickNextWord() {
+      if (state.words.length === 0) {
+        showToast('詞庫中目前沒有詞語，請先加入！');
+        return;
+      }
+
+      let selected = "";
+
+      if (state.mode === 'unique') {
+        // 卡池抽完自動重新洗牌
+        if (state.deck.length === 0) {
+          resetDeck();
+          showToast('🎉 一輪抽完啦！牌庫已自動重整重抽');
+          playChime(true);
+        }
+        selected = state.deck.pop();
+        updateDeckProgressBar();
+      } else {
+        // 純隨機模式，盡量避免跟上一個連續重複
+        let candidate = "";
+        let attempts = 0;
+        do {
+          const idx = Math.floor(Math.random() * state.words.length);
+          candidate = state.words[idx];
+          attempts++;
+        } while (state.words.length > 1 && candidate === state.currentWord && attempts < 10);
+        selected = candidate;
+      }
+
+      state.currentWord = selected;
+      state.pickCount++;
+
+      // 加入歷史記錄
+      const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      state.history.unshift({ word: selected, time: timeString });
+      if (state.history.length > 50) state.history.pop();
+
+      // 震動與動畫
+      triggerVibration(30);
+      playChime(false);
+
+      const card = document.getElementById('wordCard');
+      const wordDisplay = document.getElementById('wordDisplay');
+      const counterText = document.getElementById('cardCounterText');
+      const hint = document.getElementById('pinyinHint');
+
+      // 翻牌與彈跳動畫
+      card.classList.remove('card-anim-flip', 'card-anim-pop');
+      void card.offsetWidth; // 強制重繪
+      card.classList.add('card-anim-flip');
+
+      setTimeout(() => {
+        wordDisplay.textContent = selected;
+        hint.classList.remove('opacity-0');
+        counterText.textContent = `抽取次數：${state.pickCount}`;
+        
+        // 隨機字體色彩點綴
+        const colors = ['text-slate-800', 'text-indigo-900', 'text-sky-900', 'text-emerald-900', 'text-violet-900'];
+        wordDisplay.className = `text-6xl sm:text-7xl font-black ${colors[Math.floor(Math.random() * colors.length)]} tracking-wider text-center drop-shadow-sm select-none transition-all`;
+
+        // 自動發音
+        if (state.voiceEnabled) {
+          speakWord(selected);
+        }
+      }, 180);
+
+      // 更新紅點
+      const historyDot = document.getElementById('historyDot');
+      historyDot.classList.remove('hidden');
+    }
+
+    function renderWordTags() {
+      const container = document.getElementById('wordsTagContainer');
+      container.innerHTML = '';
+      
+      state.words.forEach((w, index) => {
+        const tag = document.createElement('div');
+        tag.className = 'flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 border border-slate-200/80 rounded-xl text-sm font-semibold text-slate-700 transition-colors group';
+        
+        const textSpan = document.createElement('span');
+        textSpan.textContent = w;
+        textSpan.className = 'cursor-pointer';
+        textSpan.onclick = () => speakWord(w);
+
+        const delBtn = document.createElement('button');
+        delBtn.innerHTML = '<i class="ph-bold ph-x text-xs text-slate-400 group-hover:text-rose-500"></i>';
+        delBtn.className = 'p-0.5 rounded-full hover:bg-slate-200';
+        delBtn.title = '移除';
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          removeWord(index);
+        };
+
+        tag.appendChild(textSpan);
+        tag.appendChild(delBtn);
+        container.appendChild(tag);
+      });
+
+      document.getElementById('modalWordsCount').textContent = `${state.words.length} 個`;
+      document.getElementById('totalWordsBadge').textContent = `共 ${state.words.length} 個字詞`;
+    }
+
+    function removeWord(idx) {
+      if (state.words.length <= 1) {
+        showToast('至少保留一個詞語！');
+        return;
+      }
+      const removed = state.words.splice(idx, 1)[0];
+      saveWordsToStorage();
+      resetDeck();
+      renderWordTags();
+      showToast(`已移除「${removed}」`);
+    }
+
+    function addNewWord() {
+      const input = document.getElementById('inputNewWord');
+      const val = input.value.trim();
+      if (!val) return;
+
+      if (state.words.includes(val)) {
+        showToast('詞語已經存在！');
+        return;
+      }
+
+      state.words.push(val);
+      input.value = '';
+      saveWordsToStorage();
+      resetDeck();
+      renderWordTags();
+      showToast(`已新增「${val}」`);
+    }
+
+    function renderHistory() {
+      const list = document.getElementById('historyList');
+      const badge = document.getElementById('historyCountBadge');
+      list.innerHTML = '';
+      badge.textContent = `${state.history.length} 次`;
+
+      if (state.history.length === 0) {
+        list.innerHTML = `
+          <div class="py-12 text-center text-slate-400 text-sm">
+            <i class="ph-bold ph-tray text-3xl mb-2 block text-slate-300"></i>
+            暫無抽取記錄
+          </div>
+        `;
+        return;
+      }
+
+      state.history.forEach((item, i) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-indigo-50/50 transition-colors';
+        
+        row.innerHTML = `
+          <div class="flex items-center gap-3">
+            <span class="w-6 text-center text-xs font-bold text-slate-400">${state.history.length - i}</span>
+            <span class="text-base font-bold text-slate-800">${item.word}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400 font-medium">${item.time}</span>
+            <button class="speak-btn w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 flex items-center justify-center active:scale-95 shadow-xs">
+              <i class="ph-bold ph-speaker-high text-sm"></i>
+            </button>
+          </div>
+        `;
+
+        row.querySelector('.speak-btn').onclick = () => speakWord(item.word);
+        list.appendChild(row);
+      });
+    }
+
+    function setupEventListeners() {
+      // 點擊大卡片抽詞
+      document.getElementById('wordCard').addEventListener('click', (e) => {
+        // 如果點的是朗讀按鈕則只朗讀
+        if (e.target.closest('#btnCardSpeak')) {
+          e.stopPropagation();
+          if (state.currentWord) speakWord(state.currentWord);
+          return;
+        }
+        pickNextWord();
+      });
+
+      // 點擊底部按鈕抽詞
+      document.getElementById('btnPick').addEventListener('click', pickNextWord);
+
+      // 重複朗讀
+      document.getElementById('btnRepeatSound').addEventListener('click', () => {
+        if (state.currentWord) {
+          speakWord(state.currentWord);
+          triggerVibration(15);
+        } else {
+          showToast('請先抽一個詞語！');
+        }
+      });
+
+      // 重整牌庫
+      document.getElementById('btnResetDeck').addEventListener('click', () => {
+        resetDeck();
+        triggerVibration(20);
+        showToast('牌庫已重新洗牌！');
+      });
+
+      // 自動朗讀切換
+      const btnVoiceToggle = document.getElementById('btnVoiceToggle');
+      const iconVoice = document.getElementById('iconVoice');
+      btnVoiceToggle.addEventListener('click', () => {
+        state.voiceEnabled = !state.voiceEnabled;
+        if (state.voiceEnabled) {
+          iconVoice.className = 'ph-bold ph-speaker-high text-xl';
+          btnVoiceToggle.classList.remove('text-slate-400');
+          btnVoiceToggle.classList.add('text-indigo-600');
+          showToast('已開啟自動朗讀');
+        } else {
+          iconVoice.className = 'ph-bold ph-speaker-slash text-xl';
+          btnVoiceToggle.classList.remove('text-indigo-600');
+          btnVoiceToggle.classList.add('text-slate-400');
+          showToast('已靜音自動朗讀');
+        }
+      });
+
+      // 語音語言切換（粵語 / 國語）
+      const btnVoiceLang = document.getElementById('btnVoiceLang');
+      btnVoiceLang.addEventListener('click', () => {
+        if (state.voiceLang === 'zh-HK') {
+          state.voiceLang = 'zh-CN';
+          btnVoiceLang.textContent = '普通話';
+          btnVoiceLang.className = 'px-2 py-1 text-xs font-bold rounded-xl text-sky-700 bg-sky-50 border border-sky-200';
+          showToast('切換為普通話朗讀');
+        } else {
+          state.voiceLang = 'zh-HK';
+          btnVoiceLang.textContent = '粵語';
+          btnVoiceLang.className = 'px-2 py-1 text-xs font-bold rounded-xl text-indigo-700 bg-indigo-50 border border-indigo-200';
+          showToast('切換為粵語（廣東話）朗讀');
+        }
+        if (state.currentWord) speakWord(state.currentWord);
+      });
+
+      // 抽取模式切換
+      const modeRandom = document.getElementById('modeRandom');
+      const modeUnique = document.getElementById('modeUnique');
+
+      modeRandom.addEventListener('click', () => {
+        state.mode = 'random';
+        modeRandom.className = 'px-3 py-1.5 rounded-xl transition-all text-white bg-indigo-600 shadow-sm';
+        modeUnique.className = 'px-3 py-1.5 rounded-xl transition-all text-slate-500 hover:text-slate-800';
+        updateDeckProgressBar();
+        showToast('已切換為純隨機抽取模式');
+      });
+
+      modeUnique.addEventListener('click', () => {
+        state.mode = 'unique';
+        modeUnique.className = 'px-3 py-1.5 rounded-xl transition-all text-white bg-indigo-600 shadow-sm';
+        modeRandom.className = 'px-3 py-1.5 rounded-xl transition-all text-slate-500 hover:text-slate-800';
+        resetDeck();
+        updateDeckProgressBar();
+        showToast('已切換為不重複抽卡模式（抽完一輪重置）');
+      });
+
+      // 詞庫 Modal 開關
+      const modalWords = document.getElementById('modalWords');
+      const modalWordsCard = document.getElementById('modalWordsCard');
+      const btnOpenWords = document.getElementById('btnOpenWords');
+      const btnCloseWords = document.getElementById('btnCloseWords');
+      const btnCloseWordsBtn = document.getElementById('btnCloseWordsBtn');
+
+      function openWordsModal() {
+        renderWordTags();
+        modalWords.classList.remove('hidden');
+        setTimeout(() => {
+          modalWords.classList.remove('opacity-0');
+          modalWordsCard.classList.remove('translate-y-full', 'sm:scale-95');
+        }, 10);
+      }
+
+      function closeWordsModal() {
+        modalWords.classList.add('opacity-0');
+        modalWordsCard.classList.add('translate-y-full', 'sm:scale-95');
+        setTimeout(() => modalWords.classList.add('hidden'), 250);
+      }
+
+      btnOpenWords.addEventListener('click', openWordsModal);
+      btnCloseWords.addEventListener('click', closeWordsModal);
+      btnCloseWordsBtn.addEventListener('click', closeWordsModal);
+
+      // 新增詞語
+      document.getElementById('btnAddWord').addEventListener('click', addNewWord);
+      document.getElementById('inputNewWord').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') addNewWord();
+      });
+
+      // 恢復預設詞庫
+      document.getElementById('btnRestoreDefault').addEventListener('click', () => {
+        state.words = [...DEFAULT_WORD_LIST];
+        saveWordsToStorage();
+        resetDeck();
+        renderWordTags();
+        showToast('已恢復預設 35 個詞語');
+      });
+
+      // 歷史記錄 Modal 開關
+      const modalHistory = document.getElementById('modalHistory');
+      const modalHistoryCard = document.getElementById('modalHistoryCard');
+      const btnOpenHistory = document.getElementById('btnOpenHistory');
+      const btnCloseHistory = document.getElementById('btnCloseHistory');
+      const btnClearHistory = document.getElementById('btnClearHistory');
+
+      function openHistoryModal() {
+        renderHistory();
+        document.getElementById('historyDot').classList.add('hidden');
+        modalHistory.classList.remove('hidden');
+        setTimeout(() => {
+          modalHistory.classList.remove('opacity-0');
+          modalHistoryCard.classList.remove('translate-y-full', 'sm:scale-95');
+        }, 10);
+      }
+
+      function closeHistoryModal() {
+        modalHistory.classList.add('opacity-0');
+        modalHistoryCard.classList.add('translate-y-full', 'sm:scale-95');
+        setTimeout(() => modalHistory.classList.add('hidden'), 250);
+      }
+
+      btnOpenHistory.addEventListener('click', openHistoryModal);
+      btnCloseHistory.addEventListener('click', closeHistoryModal);
+
+      btnClearHistory.addEventListener('click', () => {
+        state.history = [];
+        renderHistory();
+        showToast('歷史記錄已清空');
+      });
+
+      // 點擊 Modal 遮罩層關閉
+      modalWords.addEventListener('click', (e) => {
+        if (e.target === modalWords) closeWordsModal();
+      });
+      modalHistory.addEventListener('click', (e) => {
+        if (e.target === modalHistory) closeHistoryModal();
+      });
+
+      // 空白鍵抽詞快捷鍵（桌面鍵盤支援）
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
+          e.preventDefault();
+          pickNextWord();
+        }
+      });
+    }
+
+    function updateUI() {
+      document.getElementById('totalWordsBadge').textContent = `共 ${state.words.length} 個字詞`;
+      updateDeckProgressBar();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSavedWords();
+      setupEventListeners();
+
+      // 預載語音引擎以加速手機首次響應
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = () => {
+          window.speechSynthesis.getVoices();
+        };
+      }
+    });
+  </script>
+</body>
+</html>
