@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <!-- Viewport configured for iPhone notch and Android system navigation -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>隨機抽詞卡片</title>
+
+  <!-- iOS Safari PWA Standalone Fullscreen support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="隨機抽詞">
+  
+  <!-- Android Chrome PWA support -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#3730a3">
+
+  <!-- Embedded Web App Manifest via Data URI for offline Add to Home Screen -->
+  <link rel="manifest" href='data:application/manifest+json;charset=utf-8,{"name":"隨機抽詞學習卡","short_name":"隨機抽詞","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#4338ca","icons":[{"src":"data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><rect width=%22128%22 height=%22128%22 rx=%2228%22 fill=%22%234f46e5%22/><text y=%2286%22 x=%2264%22 font-size=%2268%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22 font-weight=%22bold%22>詞</text></svg>","sizes":"192x192 512x512","type":"image/svg+xml"}]}'>
+
+  <!-- Apple Touch Icon (Data URI inline SVG) -->
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%234f46e5'/><text y='120' x='90' font-size='96' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>詞</text></svg>">
+
+  <style>
+    /* 100% Zero-External-Dependency CSS, System Fallback Fonts */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    :root {
+      --safe-top: env(safe-area-inset-top, 16px);
+      --safe-bottom: env(safe-area-inset-bottom, 16px);
+      --safe-left: env(safe-area-inset-left, 16px);
+      --safe-right: env(safe-area-inset-right, 16px);
+      --primary: #4f46e5;
+      --primary-dark: #3730a3;
+      --primary-light: #818cf8;
+      --bg-start: #0f172a;
+      --bg-end: #1e1b4b;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Hiragino Sans GB", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+      background: radial-gradient(circle at 50% 20%, #1e1b4b 0%, #0f172a 100%);
+      color: #f8fafc;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: max(12px, var(--safe-top)) max(14px, var(--safe-right)) max(12px, var(--safe-bottom)) max(14px, var(--safe-left));
+      user-select: none;
+      -webkit-user-select: none;
+      overflow-x: hidden;
+    }
+
+    /* Outer Wrapper */
+    .app-shell {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 auto;
+    }
+
+    /* Top Bar */
+    .header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px 2px;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .app-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-weight: 900;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+      flex-shrink: 0;
+    }
+
+    .title-box h1 {
+      font-size: 17px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: 0.5px;
+      line-height: 1.2;
+    }
+
+    .title-box p {
+      font-size: 11px;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    /* Action bar buttons */
+    .tool-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 4px 6px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .tool-btn {
+      background: transparent;
+      border: none;
+      color: #cbd5e1;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .tool-btn:active {
+      background: rgba(255, 255, 255, 0.12);
+      transform: scale(0.92);
+    }
+
+    .lang-pill {
+      background: rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      font-size: 12px;
+      font-weight: 800;
+      padding: 4px 8px;
+      border-radius: 9px;
+      cursor: pointer;
+    }
+
+    .dot-flag {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 7px;
+      height: 7px;
+      background: #38bdf8;
+      border-radius: 50%;
+      border: 1.5px solid #1e293b;
+      display: none;
+    }
+
+    /* Mode Selector & Status */
+    .status-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .mode-tab-group {
+      display: flex;
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: 12px;
+      padding: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .mode-tab {
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 9px;
+      border: none;
+      background: transparent;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-tab.active {
+      background: #4f46e5;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.4);
+    }
+
+    .status-badge {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 12px;
+      background: rgba(30, 41, 59, 0.8);
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 5px;
+      background: rgba(30, 41, 59, 0.9);
+      border-radius: 99px;
+      overflow: hidden;
+      display: none;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #6366f1, #06b6d4);
+      transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Big Center Flashcard */
+    .card-wrap {
+      perspective: 1000px;
+      width: 100%;
+      margin: auto 0;
+    }
+
+    .flashcard {
+      width: 100%;
+      height: 290px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      border-radius: 32px;
+      padding: 22px;
+      box-shadow: 0 20px 45px -8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+      border: 3px solid #e0e7ff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      cursor: pointer;
+      position: relative;
+      touch-action: manipulation;
+      transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .flashcard:active {
+      transform: scale(0.975);
+      border-color: #818cf8;
+      box-shadow: 0 12px 25px -4px rgba(79, 70, 229, 0.25);
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-badge {
+      background: #eef2ff;
+      color: #4338ca;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 10px;
+      letter-spacing: 0.5px;
+    }
+
+    .card-voice-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #4f46e5;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
+
+    .card-voice-btn:active {
+      transform: scale(0.9);
+      background: #f1f5f9;
+    }
+
+    .card-center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 0;
+    }
+
+    .word-text {
+      font-size: 60px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: 2px;
+      text-align: center;
+      line-height: 1.15;
+      word-break: break-word;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .word-tip {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    .card-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #94a3b8;
+      font-weight: 700;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 12px;
+    }
+
+    /* Pop Animation */
+    .anim-pop {
+      animation: popEffect 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes popEffect {
+      0% { transform: scale(0.85); opacity: 0.6; }
+      60% { transform: scale(1.08); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Bottom Buttons */
+    .action-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .btn-hero {
+      width: 100%;
+      padding: 18px 24px;
+      border-radius: 22px;
+      border: none;
+      background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+      color: #ffffff;
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 10px 24px -2px rgba(79, 70, 229, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      touch-action: manipulation;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+    }
+
+    .btn-hero:active {
+      transform: scale(0.97);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-sub {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #f1f5f9;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn-sub:active {
+      background: rgba(255, 255, 255, 0.1);
+      transform: scale(0.97);
+    }
+
+    /* Modals & Bottom Sheets */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 99;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+    }
+
+    .modal-backdrop.active {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .sheet-card {
+      width: 100%;
+      max-width: 440px;
+      max-height: 84vh;
+      background: #0f172a;
+      border-radius: 28px 28px 0 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      color: #f8fafc;
+      transform: translateY(100%);
+      transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1);
+    }
+
+    .modal-backdrop.active .sheet-card {
+      transform: translateY(0);
+    }
+
+    .sheet-title-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .sheet-title-bar h2 {
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .btn-close-sheet {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .sheet-content {
+      overflow-y: auto;
+      padding: 16px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .word-badge {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 7px 12px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .word-badge-del {
+      color: #64748b;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      line-height: 1;
+    }
+
+    .word-badge-del:hover {
+      color: #f87171;
+    }
+
+    .input-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .text-input-field {
+      flex: 1;
+      padding: 11px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(30, 41, 59, 0.7);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      outline: none;
+    }
+
+    .text-input-field:focus {
+      border-color: #6366f1;
+    }
+
+    .btn-add-word {
+      padding: 0 16px;
+      border-radius: 14px;
+      background: #4f46e5;
+      color: #ffffff;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .sheet-foot-bar {
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn-danger-text {
+      color: #f87171;
+      background: transparent;
+      border: none;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* History List */
+    .history-card-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .history-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: rgba(30, 41, 59, 0.7);
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .history-word-text {
+      font-size: 16px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .history-timestamp {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    /* Offline Toast */
+    .toast-pill {
+      position: fixed;
+      bottom: max(24px, var(--safe-bottom));
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 99px;
+      font-size: 13px;
+      font-weight: 700;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s ease;
+      z-index: 999;
+      white-space: nowrap;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+
+    .toast-pill.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* How to Install instructions tab */
+    .guide-step {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+      align-items: flex-start;
+      background: rgba(30, 41, 59, 0.5);
+      padding: 12px;
+      border-radius: 14px;
+    }
+
+    .step-num {
+      width: 24px;
+      height: 24px;
+      background: #4f46e5;
+      color: #fff;
+      font-weight: bold;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .guide-step p {
+      font-size: 13px;
+      line-height: 1.4;
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- Header -->
+  <header class="header-bar">
+    <div class="brand-group">
+      <div class="app-icon">詞</div>
+      <div class="title-box">
+        <h1>隨機詞語卡片</h1>
+        <p id="labelTotalWords">共 34 個詞語</p>
+      </div>
+    </div>
+
+    <div class="tool-group">
+      <!-- Voice Toggle -->
+      <button class="tool-btn" id="btnSoundToggle" title="聲音開關">
+        <svg id="svgSoundIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+        </svg>
+      </button>
+
+      <!-- Language switcher -->
+      <button class="lang-pill" id="btnToggleLang" title="點擊切換 粵語 / 普通話">
+        粵語
+      </button>
+
+      <!-- Manage Words -->
+      <button class="tool-btn" id="btnOpenManager" title="編輯詞庫">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+        </svg>
+      </button>
+
+      <!-- History -->
+      <button class="tool-btn" id="btnOpenHistory" title="抽取記錄">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+        <span class="dot-flag" id="historyDot"></span>
+      </button>
+
+      <!-- Install / Offline Info -->
+      <button class="tool-btn" id="btnOpenGuide" title="手機安裝與離線使用教學">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="16" x2="12" y2="12" />
+          <line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Mode & Status Indicator -->
+  <div>
+    <div class="status-strip">
+      <div class="mode-tab-group">
+        <button class="mode-tab active" id="btnTabRandom">隨機抽取</button>
+        <button class="mode-tab" id="btnTabUnique">不重複卡池</button>
+      </div>
+      <div class="status-badge" id="deckStatusBadge">
+        <span>無限隨機</span>
+      </div>
+    </div>
+    <div class="progress-bar-container" id="progressBarBox">
+      <div class="progress-bar-fill" id="progressBarFill"></div>
+    </div>
+  </div>
+
+  <!-- Big Interactive Flashcard -->
+  <div class="card-wrap">
+    <div class="flashcard" id="touchCard">
+      <div class="card-head">
+        <span class="card-badge" id="cardActionTag">按一下出詞</span>
+        <button class="card-voice-btn" id="btnSpeakCard" title="發音朗讀">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="card-center">
+        <div class="word-text" id="displayWord">準備好</div>
+        <div class="word-tip" id="displayTip">點擊白色卡片或下方按鈕開始</div>
+      </div>
+
+      <div class="card-bottom">
+        <span id="labelCounter">已抽：0 次</span>
+        <span style="color:#4f46e5;">輕觸換詞 ➜</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hero Controls -->
+  <div class="action-group">
+    <button class="btn-hero" id="btnPrimaryDraw">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+        <path d="M16 8h.01M8 8h.01M8 16h.01M16 16h.01M12 12h.01"/>
+      </svg>
+      <span>隨機出一個詞</span>
+    </button>
+
+    <div class="btn-row">
+      <button class="btn-sub" id="btnReplayAudio">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+        </svg>
+        <span>重聽發音</span>
+      </button>
+
+      <button class="btn-sub" id="btnShuffleDeck">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+        </svg>
+        <span>重整牌庫</span>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal 1: Word Manager -->
+<div class="modal-backdrop" id="modalWords">
+  <div class="sheet-card">
+    <div class="sheet-title-bar">
+      <h2>詞庫管理 (<span id="modalWordCount">34</span>)</h2>
+      <button class="btn-close-sheet" id="btnCloseWords">&times;</button>
+    </div>
+
+    <div style="padding-top: 14px;">
+      <div class="input-bar">
+        <input type="text" class="text-input-field" id="inputCustomWord" placeholder="輸入新詞語..." maxlength="12">
+        <button class="btn-add-word" id="btnSubmitWord">新增</button>
+      </div>
+    </div>
+
+    <div class="sheet-content" id="wordsBadgeContainer"></div>
+
+    <div class="sheet-foot-bar">
+      <button class="btn-danger-text" id="btnRestoreOriginal">恢復預設 34 個詞</button>
+      <button class="btn-sub" style="flex: initial; padding: 6px 16px;" id="btnCloseWords2">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 2: History List -->
+<div class="modal-backdrop" id="modalHistory">
+  <div class="sheet-card">
+    <div class="sheet-title-bar">
+      <h2>抽詞記錄</h2>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button class="btn-danger-text" id="btnClearHistory">清空記錄</button>
+        <button class="btn-close-sheet" id="btnCloseHistory">&times;</button>
+      </div>
+    </div>
+
+    <div class="sheet-content" id="historyContainer"></div>
+  </div>
+</div>
+
+<!-- Modal 3: Add to Home Screen Instructions -->
+<div class="modal-backdrop" id="modalGuide">
+  <div class="sheet-card">
+    <div class="sheet-title-bar">
+      <h2>📱 手機離線安裝指引</h2>
+      <button class="btn-close-sheet" id="btnCloseGuide">&times;</button>
+    </div>
+
+    <div class="sheet-content" style="flex-direction: column;">
+      <h3 style="font-size:14px; color:#a5b4fc; margin-bottom:8px;">🍏 iPhone / iPad (Safari)</h3>
+      <div class="guide-step">
+        <div class="step-num">1</div>
+        <p>點擊 Safari 底部正中間的 <strong>「分享」按鈕</strong>（帶箭頭的方框）。</p>
+      </div>
+      <div class="guide-step">
+        <div class="step-num">2</div>
+        <p>向下滑動，選擇 <strong>「加入主畫面」(Add to Home Screen)</strong>。</p>
+      </div>
+      <div class="guide-step">
+        <div class="step-num">3</div>
+        <p>點右上角「新增」，手機桌面即有專屬圖示，無網無伺服器亦可全螢幕使用！</p>
+      </div>
+
+      <h3 style="font-size:14px; color:#38bdf8; margin: 12px 0 8px;">🤖 Android 手機 (Chrome)</h3>
+      <div class="guide-step">
+        <div class="step-num">1</div>
+        <p>點擊 Chrome 右上角的 <strong>三個點圖示</strong>。</p>
+      </div>
+      <div class="guide-step">
+        <div class="step-num">2</div>
+        <p>點選 <strong>「安裝應用程式」</strong> 或 <strong>「新增至主螢幕」</strong> 即可。</p>
+      </div>
+    </div>
+
+    <div class="sheet-foot-bar">
+      <button class="btn-sub" style="width: 100%;" id="btnCloseGuide2">我知道了</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Popup -->
+<div class="toast-pill" id="appToast">提示訊息</div>
+
+<script>
+  // 完整 34 個指定詞彙清單
+  const DEFAULT_LIST = [
+    "背上", "寶貝", "不少", "作業本", "顏色筆", "收拾", "書包", "新", "我",
+    "小學生", "課本", "鉛筆", "上學",
+    "先", "飯菜", "香", "擺", "滿", "桌", "吃", "說", "爸爸", "媽媽", "祖母",
+    "大家",
+    "可可", "茶", "咖啡", "飲料", "喝", "愛", "杯", "味道", "美妙"
+  ];
+
+  // App 狀態
+  const state = {
+    words: [...DEFAULT_LIST],
+    deck: [],
+    history: [],
+    currentWord: "",
+    mode: "random", // 'random' 或 'unique'
+    soundEnabled: true,
+    speechLang: "zh-HK", // 'zh-HK' 或 'zh-CN'
+    count: 0
+  };
+
+  // 本地純 Web Audio API 提示音合成器（零依賴）
+  let webAudioCtx = null;
+  function playHapticBeep() {
+    if (!state.soundEnabled) return;
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      if (!webAudioCtx) webAudioCtx = new AudioContextClass();
+      if (webAudioCtx.state === "suspended") webAudioCtx.resume();
+
+      const osc = webAudioCtx.createOscillator();
+      const gain = webAudioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(webAudioCtx.destination);
+
+      const now = webAudioCtx.currentTime;
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(780, now + 0.08);
+
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+      osc.start(now);
+      osc.stop(now + 0.08);
+    } catch (e) {}
+  }
+
+  // 語音朗讀 (Web Speech API)
+  function speakCurrentWord(word) {
+    if (!state.soundEnabled) return;
+    if (!('speechSynthesis' in window)) return;
+    if (!word || word === "準備好" || word === "牌庫已空") return;
+
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(word);
+      utterance.rate = 0.95;
+      utterance.pitch = 1.0;
+
+      const voices = window.speechSynthesis.getVoices() || [];
+      let matched = null;
+
+      if (state.speechLang === 'zh-HK') {
+        matched = voices.find(v => 
+          v.lang === 'zh-HK' ||
+          v.lang.toLowerCase().includes('yue') ||
+          v.name.includes('Cantonese') ||
+          v.name.includes('Sin-ji') ||
+          v.name.includes('Hong Kong')
+        );
+        if (!matched) {
+          matched = voices.find(v => v.lang.startsWith('zh'));
+        }
+        utterance.lang = 'zh-HK';
+      } else {
+        matched = voices.find(v => 
+          v.lang === 'zh-CN' ||
+          v.lang === 'zh-TW' ||
+          v.name.includes('Mandarin')
+        );
+        utterance.lang = 'zh-CN';
+      }
+
+      if (matched) utterance.voice = matched;
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {}
+  }
+
+  // 觸覺微震動
+  function triggerVibrate(ms = 22) {
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate(ms); } catch (e) {}
+    }
+  }
+
+  // 提示氣泡
+  let toastTimer = null;
+  function showToast(msg) {
+    const el = document.getElementById("appToast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 2000);
+  }
+
+  // 洗牌 (Fisher-Yates)
+  function shuffleDeck() {
+    state.deck = [...state.words];
+    for (let i = state.deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [state.deck[i], state.deck[j]] = [state.deck[j], state.deck[i]];
+    }
+    updateStatusVisuals();
+  }
+
+  // 核心隨機出詞函數
+  function pickNextWord() {
+    if (state.words.length === 0) {
+      showToast("詞庫為空，請先新增詞語！");
+      return;
+    }
+
+    let word = "";
+    if (state.mode === "unique") {
+      if (state.deck.length === 0) {
+        shuffleDeck();
+        showToast("🎉 一輪全部抽完！牌庫已自動重整重抽");
+      }
+      word = state.deck.pop();
+    } else {
+      // 純隨機模式：避免與上一個詞連續重複
+      let candidate = "";
+      let attempts = 0;
+      do {
+        const rnd = Math.floor(Math.random() * state.words.length);
+        candidate = state.words[rnd];
+        attempts++;
+      } while (state.words.length > 1 && candidate === state.currentWord && attempts < 12);
+      word = candidate;
+    }
+
+    state.currentWord = word;
+    state.count++;
+
+    // 歷史記錄
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    state.history.unshift({ word, time: timeStr });
+    if (state.history.length > 60) state.history.pop();
+    document.getElementById("historyDot").style.display = "block";
+
+    // 觸覺與原生音效
+    triggerVibrate(25);
+    playHapticBeep();
+
+    // 更新卡片 UI 與彈跳動畫
+    const wordDisplay = document.getElementById("displayWord");
+    const tipDisplay = document.getElementById("displayTip");
+    const counterDisplay = document.getElementById("labelCounter");
+
+    wordDisplay.classList.remove("anim-pop");
+    void wordDisplay.offsetWidth; // 強制重繪
+    wordDisplay.textContent = word;
+    wordDisplay.classList.add("anim-pop");
+
+    tipDisplay.textContent = `詞語長度：${word.length} 個字`;
+    counterDisplay.textContent = `已抽：${state.count} 次`;
+
+    updateStatusVisuals();
+    speakCurrentWord(word);
+  }
+
+  // 更新模式與牌庫進度狀態
+  function updateStatusVisuals() {
+    const badge = document.getElementById("deckStatusBadge");
+    const pBox = document.getElementById("progressBarBox");
+    const pFill = document.getElementById("progressBarFill");
+
+    if (state.mode === "unique") {
+      pBox.style.display = "block";
+      const total = state.words.length;
+      const remain = state.deck.length;
+      badge.textContent = `剩餘 ${remain} / ${total}`;
+      const pct = total > 0 ? (remain / total) * 100 : 0;
+      pFill.style.width = pct + "%";
+    } else {
+      pBox.style.display = "none";
+      badge.textContent = "無限隨機";
+    }
+
+    document.getElementById("labelTotalWords").textContent = `共 ${state.words.length} 個詞語`;
+    document.getElementById("modalWordCount").textContent = state.words.length;
+  }
+
+  // 渲染詞庫標籤清單
+  function renderWordsManager() {
+    const box = document.getElementById("wordsBadgeContainer");
+    box.innerHTML = "";
+
+    state.words.forEach((w, idx) => {
+      const chip = document.createElement("div");
+      chip.className = "word-badge";
+      chip.innerHTML = `
+        <span style="cursor:pointer;">${w}</span>
+        <span class="word-badge-del" title="刪除">&times;</span>
+      `;
+      chip.querySelector("span").onclick = () => speakCurrentWord(w);
+      chip.querySelector(".word-badge-del").onclick = (e) => {
+        e.stopPropagation();
+        if (state.words.length <= 1) {
+          showToast("至少需保留一個詞語");
+          return;
+        }
+        state.words.splice(idx, 1);
+        shuffleDeck();
+        renderWordsManager();
+        saveLocalStorage();
+        showToast(`已刪除「${w}」`);
+      };
+      box.appendChild(chip);
+    });
+  }
+
+  // 渲染抽詞歷史記錄
+  function renderHistoryDrawer() {
+    const box = document.getElementById("historyContainer");
+    box.innerHTML = "";
+
+    if (state.history.length === 0) {
+      box.innerHTML = `<div style="width:100%; text-align:center; padding:35px 0; color:#64748b; font-size:14px; font-weight:600;">暫無抽詞記錄</div>`;
+      return;
+    }
+
+    const list = document.createElement("div");
+    list.className = "history-card-list";
+
+    state.history.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "history-row";
+      row.innerHTML = `
+        <span class="history-word-text">${item.word}</span>
+        <span class="history-timestamp">${item.time}</span>
+      `;
+      row.onclick = () => speakCurrentWord(item.word);
+      list.appendChild(row);
+    });
+
+    box.appendChild(list);
+  }
+
+  // 本地永久存取 (LocalStorage)
+  function saveLocalStorage() {
+    try {
+      localStorage.setItem("local_pwa_words_v3", JSON.stringify(state.words));
+    } catch(e) {}
+  }
+
+  function loadLocalStorage() {
+    try {
+      const saved = localStorage.getItem("local_pwa_words_v3");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          state.words = parsed;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 註冊極簡內嵌 Service Worker（完全離線支援）
+  function setupOfflinePWA() {
+    if ('serviceWorker' in navigator) {
+      try {
+        const swBlob = new Blob([
+          `self.addEventListener('install', e => self.skipWaiting());
+           self.addEventListener('activate', e => self.clients.claim());
+           self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));`
+        ], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(swBlob);
+        navigator.serviceWorker.register(swUrl).catch(() => {});
+      } catch (err) {}
+    }
+  }
+
+  // 事件綁定
+  function initEvents() {
+    // 點擊大卡片與主按鈕
+    document.getElementById("btnPrimaryDraw").addEventListener("click", pickNextWord);
+    document.getElementById("touchCard").addEventListener("click", (e) => {
+      if (e.target.closest("#btnSpeakCard")) return;
+      pickNextWord();
+    });
+
+    // 朗讀按鈕
+    document.getElementById("btnSpeakCard").addEventListener("click", () => {
+      if (state.currentWord) speakCurrentWord(state.currentWord);
+      else pickNextWord();
+    });
+
+    document.getElementById("btnReplayAudio").addEventListener("click", () => {
+      if (state.currentWord) {
+        speakCurrentWord(state.currentWord);
+        triggerVibrate(15);
+      } else {
+        showToast("請先點擊抽詞");
+      }
+    });
+
+    // 重整牌庫
+    document.getElementById("btnShuffleDeck").addEventListener("click", () => {
+      shuffleDeck();
+      triggerVibrate(20);
+      showToast("牌庫已重新洗牌！");
+    });
+
+    // 音效開關
+    const btnSound = document.getElementById("btnSoundToggle");
+    btnSound.addEventListener("click", () => {
+      state.soundEnabled = !state.soundEnabled;
+      btnSound.style.color = state.soundEnabled ? "#cbd5e1" : "#64748b";
+      showToast(state.soundEnabled ? "已開啟自動發音與音效" : "已靜音發音");
+    });
+
+    // 語音語言切換（粵語 / 普通話）
+    const btnLang = document.getElementById("btnToggleLang");
+    btnLang.addEventListener("click", () => {
+      if (state.speechLang === "zh-HK") {
+        state.speechLang = "zh-CN";
+        btnLang.textContent = "普通話";
+        btnLang.style.background = "rgba(14, 165, 233, 0.2)";
+        btnLang.style.borderColor = "rgba(14, 165, 233, 0.4)";
+        btnLang.style.color = "#38bdf8";
+        showToast("已切換為普通話朗讀");
+      } else {
+        state.speechLang = "zh-HK";
+        btnLang.textContent = "粵語";
+        btnLang.style.background = "rgba(99, 102, 241, 0.2)";
+        btnLang.style.borderColor = "rgba(99, 102, 241, 0.4)";
+        btnLang.style.color = "#a5b4fc";
+        showToast("已切換為粵語（廣東話）朗讀");
+      }
+      if (state.currentWord) speakCurrentWord(state.currentWord);
+    });
+
+    // 模式切換
+    const tabR = document.getElementById("btnTabRandom");
+    const tabU = document.getElementById("btnTabUnique");
+
+    tabR.addEventListener("click", () => {
+      state.mode = "random";
+      tabR.classList.add("active");
+      tabU.classList.remove("active");
+      updateStatusVisuals();
+      showToast("已切換至：純隨機模式");
+    });
+
+    tabU.addEventListener("click", () => {
+      state.mode = "unique";
+      tabU.classList.add("active");
+      tabR.classList.remove("active");
+      shuffleDeck();
+      updateStatusVisuals();
+      showToast("已切換至：不重複卡池模式");
+    });
+
+    // 詞庫 Modal 控制
+    const modalWords = document.getElementById("modalWords");
+    document.getElementById("btnOpenManager").addEventListener("click", () => {
+      renderWordsManager();
+      modalWords.classList.add("active");
+    });
+    const hideWordsModal = () => modalWords.classList.remove("active");
+    document.getElementById("btnCloseWords").addEventListener("click", hideWordsModal);
+    document.getElementById("btnCloseWords2").addEventListener("click", hideWordsModal);
+
+    // 新增詞語
+    const handleAdd = () => {
+      const field = document.getElementById("inputCustomWord");
+      const val = field.value.trim();
+      if (!val) return;
+      if (state.words.includes(val)) {
+        showToast("詞語已存在");
+        return;
+      }
+      state.words.push(val);
+      field.value = "";
+      shuffleDeck();
+      renderWordsManager();
+      saveLocalStorage();
+      showToast(`已新增「${val}」`);
+    };
+    document.getElementById("btnSubmitWord").addEventListener("click", handleAdd);
+    document.getElementById("inputCustomWord").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleAdd();
+    });
+
+    // 恢復預設詞庫
+    document.getElementById("btnRestoreOriginal").addEventListener("click", () => {
+      state.words = [...DEFAULT_LIST];
+      shuffleDeck();
+      renderWordsManager();
+      saveLocalStorage();
+      showToast("已恢復原裝 34 個預設詞語");
+    });
+
+    // 歷史 Modal 控制
+    const modalHist = document.getElementById("modalHistory");
+    document.getElementById("btnOpenHistory").addEventListener("click", () => {
+      renderHistoryDrawer();
+      document.getElementById("historyDot").style.display = "none";
+      modalHist.classList.add("active");
+    });
+    document.getElementById("btnCloseHistory").addEventListener("click", () => {
+      modalHist.classList.remove("active");
+    });
+    document.getElementById("btnClearHistory").addEventListener("click", () => {
+      state.history = [];
+      renderHistoryDrawer();
+      showToast("抽詞記錄已清空");
+    });
+
+    // 安裝教學 Modal 控制
+    const modalGuide = document.getElementById("modalGuide");
+    document.getElementById("btnOpenGuide").addEventListener("click", () => {
+      modalGuide.classList.add("active");
+    });
+    document.getElementById("btnCloseGuide").addEventListener("click", () => {
+      modalGuide.classList.remove("active");
+    });
+    document.getElementById("btnCloseGuide2").addEventListener("click", () => {
+      modalGuide.classList.remove("active");
+    });
+
+    // 點擊遮罩層關閉
+    [modalWords, modalHist, modalGuide].forEach(m => {
+      m.addEventListener("click", (e) => {
+        if (e.target === m) m.classList.remove("active");
+      });
+    });
+
+    // 實體空白鍵快捷鍵
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space" && e.target.tagName !== "INPUT") {
+        e.preventDefault();
+        pickNextWord();
+      }
+    });
+  }
+
+  // 初始啟動
+  loadLocalStorage();
+  shuffleDeck();
+  initEvents();
+  updateStatusVisuals();
+  setupOfflinePWA();
+
+  // 預載語音清單
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.getVoices();
+    };
+  }
+</script>
+</body>
+</html>
